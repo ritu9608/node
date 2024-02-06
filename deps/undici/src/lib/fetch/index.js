@@ -1099,11 +1099,12 @@ function fetchFinale (fetchParams, response) {
 
     const byteStream = new ReadableStream({
       readableStream: transformStream.readable,
+      async start () {
+        this._bodyReader = this.readableStream.getReader()
+      },
       async pull (controller) {
-        const reader = this.readableStream.getReader()
-
         while (controller.desiredSize >= 0) {
-          const { done, value } = await reader.read()
+          const { done, value } = await this._bodyReader.read()
 
           if (done) {
             queueMicrotask(() => readableStreamClose(controller))
@@ -1905,8 +1906,8 @@ async function httpNetworkFetch (
 
   // 11. Let pullAlgorithm be an action that resumes the ongoing fetch
   // if it is suspended.
-  const pullAlgorithm = () => {
-    fetchParams.controller.resume()
+  const pullAlgorithm = async () => {
+    await fetchParams.controller.resume()
   }
 
   // 12. Let cancelAlgorithm be an algorithm that aborts fetchParams’s
@@ -2032,7 +2033,7 @@ async function httpNetworkFetch (
 
       // 9. If stream doesn’t need more data ask the user agent to suspend
       // the ongoing fetch.
-      if (!fetchParams.controller.controller.desiredSize) {
+      if (fetchParams.controller.controller.desiredSize <= 0) {
         return
       }
     }
